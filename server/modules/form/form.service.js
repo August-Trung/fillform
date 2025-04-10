@@ -1,6 +1,8 @@
+// File: server/modules/form/form.service.js
+require("dotenv").config();
 const Form = require("./form.model");
 const { parseGoogleForm } = require("../../utils/crawler");
-const submitGoogleForm = require("../../utils/submitter");
+const { submitGoogleForm } = require("../../utils/submitter");
 
 const parseForm = async (formLink) => {
 	const formData = await parseGoogleForm(formLink);
@@ -13,21 +15,25 @@ const saveFormConfig = async (formLink, config) => {
 	return newForm;
 };
 
-const fillFormWithData = async (formLink, values, config) => {
+async function fillFormWithData(formLink, values, config) {
+	// Build payload như trước
 	const payload = {};
 	for (const field of config) {
-		const { variable, entryId } = field;
-		if (entryId && values[variable] !== undefined) {
-			payload[entryId] = values[variable];
+		if (field.entryId && values[field.variable] != null) {
+			payload[field.entryId] = values[field.variable];
 		}
 	}
-	console.log("🟡 Payload sẽ gửi:", payload);
-	console.log("📮 Form link:", formLink);
-	console.log("📋 Config:", config);
-	console.log("🧾 Values:", values);
 
-	// Sử dụng Puppeteer để submit form
-	await submitGoogleForm(formLink, payload);
-};
+	// Gọi submit với timeout 20 s, headless=false khi dev
+	const result = await submitGoogleForm(formLink, payload, {
+		timeout: 30000,
+		headless: false,
+		slowMo: 500,
+	});
+
+	if (!result.ok) {
+		throw new Error(`Không thể submit form: ${result.error}`);
+	}
+}
 
 module.exports = { parseForm, saveFormConfig, fillFormWithData };
