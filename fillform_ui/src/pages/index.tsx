@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import axios from "axios";
 import FormConfigurator from "../components/FormConfigurator";
+import { ParsedForm } from "../types";
 
-const Home = () => {
+const Home: React.FC = () => {
 	const [formLink, setFormLink] = useState("");
-	const [formData, setFormData] = useState(null);
+	const [parsedForm, setParsedForm] = useState<ParsedForm | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [fetchError, setFetchError] = useState<string | null>(null);
-	const [formTitle, setFormTitle] = useState<string>("");
 
 	const handleParseForm = async () => {
 		setLoading(true);
+		setParsedForm(null);
 		try {
 			const res = await axios.post(
 				"http://localhost:5000/api/form/parse",
@@ -19,24 +20,27 @@ const Home = () => {
 				}
 			);
 
-			if (Array.isArray(res.data.fields)) {
-				setFormData(res.data.fields);
-				setFormTitle(res.data.title || "Không rõ tên form");
+			const { form, latest_form_questions, config } = res.data;
+
+			if (form && Array.isArray(latest_form_questions) && config) {
+				setParsedForm({
+					form,
+					latest_form_questions,
+					formConfig: config,
+				});
 				setFetchError(null);
-				console.log("Response data:", res.data);
+				console.log("✅ Parsed form:", res.data);
 			} else {
 				setFetchError("Form không hợp lệ.");
-				setFormData(null);
 			}
 		} catch (error) {
-			console.error("Error parsing form", error);
+			console.error("❌ Error parsing form", error);
 			setFetchError(
 				"Không thể đọc được form. Có thể do bật 'Thu thập địa chỉ email'."
 			);
 			alert(
 				"❌ Không thể đọc được form.\n\n👉 Hãy vào Google Form → Cài đặt (biểu tượng bánh răng) → Bỏ chọn 'Thu thập địa chỉ email'."
 			);
-			setFormData(null);
 		}
 		setLoading(false);
 	};
@@ -67,25 +71,19 @@ const Home = () => {
 				</button>
 			</div>
 
-			{/* Hiển thị lỗi */}
 			{fetchError && (
 				<div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded mt-6">
 					⚠️ {fetchError}
 				</div>
 			)}
 
-			{/* Hiển thị tiêu đề form và cấu hình nếu có dữ liệu */}
-			{formData && (
+			{parsedForm && (
 				<div className="mt-8">
 					<h2 className="text-2xl font-semibold text-gray-800 mb-4">
-						📝 Tên form: {formTitle}
+						📝 Tên form:{" "}
+						{parsedForm.form?.name || "Không rõ tên form"}
 					</h2>
-
-					<FormConfigurator
-						formLink={formLink}
-						formData={formData}
-						error={fetchError}
-					/>
+					<FormConfigurator parsedForm={parsedForm} />
 				</div>
 			)}
 		</div>

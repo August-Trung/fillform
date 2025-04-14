@@ -1,33 +1,43 @@
-const {
-	parseForm,
-	saveFormConfig,
-	fillFormWithData,
-} = require("./form.service");
-const { validateFormConfig } = require("./form.validator");
+const { parseForm, saveFormToDB, fillFormWithData } = require("./form.service");
 
 const parseFormController = async (req, res, next) => {
 	try {
 		const { formLink } = req.body;
-		console.log("Nhận link từ frontend:", formLink);
 		if (!formLink) {
-			return res.status(400).json({ error: "Missing formLink" });
+			return res.status(400).json({ error: "Thiếu formLink" });
 		}
 		const formData = await parseForm(formLink);
-		console.log("✅ BE gửi về FE:", formData); // THÊM DÒNG NÀY
+		console.log("✅ Dữ liệu form parse được:", formData);
 		res.json(formData);
 	} catch (error) {
-		console.error("❌ BE lỗi parseFormController:", error); // THÊM DÒNG NÀY
+		console.error("❌ Lỗi parseFormController:", error);
 		next(error);
 	}
 };
 
-const saveFormConfigController = async (req, res, next) => {
+const saveFormController = async (req, res, next) => {
 	try {
-		const { formLink, config } = req.body;
-		validateFormConfig({ formLink, config });
-		const result = await saveFormConfig(formLink, config);
-		res.json({ message: "Configuration saved successfully", data: result });
+		const { form, latest_form_questions, formConfig, fieldConfigs } =
+			req.body;
+		if (
+			!form ||
+			!Array.isArray(latest_form_questions) ||
+			!formConfig ||
+			!Array.isArray(fieldConfigs)
+		) {
+			return res.status(400).json({ error: "Dữ liệu form không hợp lệ" });
+		}
+
+		const savedForm = await saveFormToDB({
+			form,
+			latest_form_questions,
+			formConfig,
+			fieldConfigs,
+		});
+
+		res.json({ message: "Đã lưu form thành công", data: savedForm });
 	} catch (error) {
+		console.error("❌ Lỗi saveFormController:", error);
 		next(error);
 	}
 };
@@ -36,14 +46,8 @@ const fillFormController = async (req, res, next) => {
 	try {
 		const { formLink, values, config } = req.body;
 		await fillFormWithData(formLink, values, config);
-		console.log("🔻 formLink:", req.body.formLink);
-		console.log("🔻 values:", req.body.values);
-		console.log("🔻 config:", req.body.config);
-		res.json({ message: "Form submitted successfully" });
+		res.json({ message: "Đã submit form thành công" });
 	} catch (error) {
-		console.log("🔻 formLink:", req.body.formLink);
-		console.log("🔻 values:", req.body.values);
-		console.log("🔻 config:", req.body.config);
 		console.error("❌ Lỗi fillFormController:", error);
 		next(error);
 	}
@@ -51,6 +55,6 @@ const fillFormController = async (req, res, next) => {
 
 module.exports = {
 	parseFormController,
-	saveFormConfigController,
+	saveFormController,
 	fillFormController,
 };

@@ -25,6 +25,7 @@ const FormFillerUI: React.FC<FormFillerUIProps> = ({ formLink, config }) => {
 				values,
 				config: validConfig, // 👈 Gửi kèm cấu hình để ánh xạ biến → entryId
 			});
+			
 			alert("✅ Form đã được điền thành công!");
 			console.log("🧩 Config to backend:", config);
 		} catch (err) {
@@ -45,7 +46,7 @@ const FormFillerUI: React.FC<FormFillerUIProps> = ({ formLink, config }) => {
 			{config.map((field, index) => (
 				<div key={index} className="mb-6">
 					<label className="block text-gray-700 font-medium mb-2">
-						{field.title}
+						{field.question}
 					</label>
 					{field.type === "short-text" ||
 					field.type === "paragraph" ? (

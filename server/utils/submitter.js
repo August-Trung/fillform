@@ -3,7 +3,7 @@ const puppeteer = require("puppeteer");
 
 // Mặc định timeout 15s nếu không truyền vào
 const DEFAULT_TIMEOUT = 15000;
-const DEFAULT_SLOWMO = 100;
+// const DEFAULT_SLOWMO = 100;
 
 /**
  * Click selector và chờ navigation (có retry khi timeout)
@@ -39,11 +39,10 @@ async function clickAndWait(page, selector, timeout) {
 async function submitGoogleForm(formLink, payload, options = {}) {
 	const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 	const headless = options.headless ?? process.env.NODE_ENV === "production";
-	const slowMo = options.slowMo ?? (headless ? 0 : DEFAULT_SLOWMO);
+	// const slowMo = options.slowMo ?? (headless ? 0 : DEFAULT_SLOWMO);
 
 	const browser = await puppeteer.launch({
 		headless,
-		slowMo,
 		args: ["--no-sandbox", "--disable-setuid-sandbox"],
 	});
 	const page = await browser.newPage();
@@ -84,9 +83,18 @@ async function submitGoogleForm(formLink, payload, options = {}) {
 
 		console.log("✅ Đã điền dữ liệu vào form");
 
-		// Click Gửi và đợi navigation
-		const submitBtnSel = 'form [role="button"], form button[type="submit"]';
-		await clickAndWait(page, submitBtnSel, timeout);
+		const submitBtnSel = 'form div[role="button"]';
+		await page.waitForSelector(submitBtnSel, { timeout, visible: true });
+
+		await page.evaluate((sel) => {
+			const btn = document.querySelector(sel);
+			if (btn) {
+				btn.scrollIntoView({ behavior: "smooth", block: "center" });
+				btn.click();
+			}
+		}, submitBtnSel);
+
+		await page.waitForNavigation({ waitUntil: "networkidle2", timeout });
 
 		console.log("✅ Form submitted successfully!");
 		return { ok: true };

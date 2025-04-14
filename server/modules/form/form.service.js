@@ -1,22 +1,35 @@
-// File: server/modules/form/form.service.js
-require("dotenv").config();
 const Form = require("./form.model");
 const { parseGoogleForm } = require("../../utils/crawler");
 const { submitGoogleForm } = require("../../utils/submitter");
 
 const parseForm = async (formLink) => {
 	const formData = await parseGoogleForm(formLink);
-	return formData;
+	return {
+		...formData,
+		formConfig: formData.config,
+		// bỏ fieldConfigs ở bước parse
+	};
 };
 
-const saveFormConfig = async (formLink, config) => {
-	const newForm = new Form({ formLink, config });
-	await newForm.save();
-	return newForm;
-};
+async function saveFormToDB({
+	form,
+	latest_form_questions,
+	formConfig,
+	fieldConfigs,
+}) {
+	const { id, ...formWithoutId } = form;
 
-async function fillFormWithData(formLink, values, config) {
-	// Build payload như trước
+	const formDoc = new Form({
+		...formWithoutId,
+		latest_form_questions,
+		formConfig,
+		fieldConfigs,
+	});
+	await formDoc.save();
+	return formDoc;
+}
+
+const fillFormWithData = async (formLink, values, config) => {
 	const payload = {};
 	for (const field of config) {
 		if (field.entryId && values[field.variable] != null) {
@@ -24,7 +37,6 @@ async function fillFormWithData(formLink, values, config) {
 		}
 	}
 
-	// Gọi submit với timeout 20 s, headless=false khi dev
 	const result = await submitGoogleForm(formLink, payload, {
 		timeout: 30000,
 		headless: false,
@@ -34,6 +46,10 @@ async function fillFormWithData(formLink, values, config) {
 	if (!result.ok) {
 		throw new Error(`Không thể submit form: ${result.error}`);
 	}
-}
+};
 
-module.exports = { parseForm, saveFormConfig, fillFormWithData };
+module.exports = {
+	parseForm,
+	saveFormToDB,
+	fillFormWithData,
+};
