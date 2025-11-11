@@ -44,7 +44,29 @@ function toViewForm(link) {
 	}
 }
 
-const fillFormWithData = async (formLink, values, config) => {
+const parseBoolEnv = (value, fallback) => {
+	if (value === undefined) return fallback;
+	if (value === "true" || value === "1") return true;
+	if (value === "false" || value === "0") return false;
+	return fallback;
+};
+
+const toNumber = (value, fallback) => {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const defaultAutomationOptions = {
+	timeout: toNumber(process.env.FORM_FILL_TIMEOUT, 60000),
+	headless: parseBoolEnv(process.env.FORM_FILL_HEADLESS, false),
+	slowMo: toNumber(
+		process.env.FORM_FILL_SLOWMO,
+		parseBoolEnv(process.env.FORM_FILL_HEADLESS, false) ? 0 : 50
+	),
+	typingDelay: toNumber(process.env.FORM_FILL_TYPING_DELAY, 20),
+};
+
+const fillFormWithData = async (formLink, values, config, options = {}) => {
 	formLink = toViewForm(formLink);
 
 	const payload = {};
@@ -54,11 +76,18 @@ const fillFormWithData = async (formLink, values, config) => {
 		}
 	}
 
-	const result = await submitGoogleForm(formLink, payload, {
-		timeout: 60000,
-		headless: false,
-		slowMo: 500,
-	});
+	const automationOptions = {
+		timeout: options.timeout ?? defaultAutomationOptions.timeout,
+		headless: options.headless ?? defaultAutomationOptions.headless,
+		slowMo: options.slowMo ?? defaultAutomationOptions.slowMo,
+		typingDelay: options.typingDelay ?? defaultAutomationOptions.typingDelay,
+	};
+
+	const result = await submitGoogleForm(
+		formLink,
+		payload,
+		automationOptions
+	);
 
 	if (!result.ok) {
 		const errMsg = result.error || "Không rõ lỗi";

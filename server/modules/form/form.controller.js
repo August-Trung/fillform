@@ -44,8 +44,8 @@ const saveFormController = async (req, res, next) => {
 
 const fillFormController = async (req, res, next) => {
 	try {
-		const { formLink, values, config } = req.body;
-		await fillFormWithData(formLink, values, config);
+		const { formLink, values, config, options } = req.body;
+		await fillFormWithData(formLink, values, config, options);
 		res.json({ message: "Đã submit form thành công" });
 	} catch (error) {
 		console.error("❌ Lỗi fillFormController:", error);

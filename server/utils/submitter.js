@@ -133,14 +133,17 @@ async function ensureEditableSelector(page, entryId, timeout) {
 	);
 }
 
-async function setFieldValue(page, entryId, value, timeout, slowMo) {
+async function setFieldValue(page, entryId, value, timeout, typingDelay) {
 	const selector = await ensureEditableSelector(page, entryId, timeout);
 	if (!selector) {
 		throw new Error(`Không tìm thấy input cho ${entryId}`);
 	}
 
 	const textValue = `${value ?? ""}`;
-	const delay = Math.min(slowMo || 50, 150);
+	const delay = Math.min(
+		typeof typingDelay === "number" ? typingDelay : 20,
+		150
+	);
 
 	await page.waitForSelector(selector, { timeout });
 
@@ -221,6 +224,9 @@ async function submitGoogleForm(formLink, payload, options = {}) {
 	const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 	const headless = options.headless ?? process.env.NODE_ENV === "production";
 	const slowMo = options.slowMo ?? (headless ? 0 : DEFAULT_SLOWMO);
+	const typingDelay =
+		options.typingDelay ??
+		(slowMo ? Math.min(slowMo, 150) : DEFAULT_SLOWMO / 2);
 
 	const browser = await puppeteer.launch({
 		headless,
@@ -284,7 +290,7 @@ async function submitGoogleForm(formLink, payload, options = {}) {
 				Array.isArray(rawValue) && rawValue.length > 0
 					? rawValue.join(", ")
 					: `${rawValue ?? ""}`;
-			await setFieldValue(page, entryId, value, timeout, slowMo);
+			await setFieldValue(page, entryId, value, timeout, typingDelay);
 			if (slowMo > 0) {
 				await sleep(Math.min(slowMo, 200));
 			}
