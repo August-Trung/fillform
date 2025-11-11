@@ -8,30 +8,64 @@ interface FormFillerUIProps {
 }
 
 const FormFillerUI: React.FC<FormFillerUIProps> = ({ formLink, config }) => {
-	const [values, setValues] = useState<{ [key: string]: string }>({});
+	// Lọc ra chỉ những field có entryId
+	const validFields = config.filter((f) => !!f.entryId);
+
+	// Khởi tạo state values: text => "", checkbox => []
+	const [values, setValues] = useState<{ [key: string]: any }>(
+		validFields.reduce(
+			(acc, field) => {
+				acc[field.variable] = field.type === "checkbox" ? [] : "";
+				return acc;
+			},
+			{} as { [key: string]: any }
+		)
+	);
+
 	const [loading, setLoading] = useState(false);
 
-	const handleChange = (variable: string, value: string) => {
+	const handleChange = (variable: string, value: any) => {
 		setValues((prev) => ({ ...prev, [variable]: value }));
+	};
+
+	const handleCheckboxChange = (
+		variable: string,
+		option: string,
+		checked: boolean
+	) => {
+		setValues((prev) => {
+			const arr: string[] = Array.isArray(prev[variable])
+				? prev[variable]
+				: [];
+			return {
+				...prev,
+				[variable]: checked
+					? [...arr, option]
+					: arr.filter((v) => v !== option),
+			};
+		});
 	};
 
 	const handleSubmit = async () => {
 		setLoading(true);
 		try {
-			const validConfig = config.filter((field) => !!field.entryId);
-
 			await axios.post("http://localhost:5000/api/form/fill", {
 				formLink,
 				values,
-				config: validConfig, // 👈 Gửi kèm cấu hình để ánh xạ biến → entryId
+				config: validFields,
 			});
-			
 			alert("✅ Form đã được điền thành công!");
-			console.log("🧩 Config to backend:", config);
-		} catch (err) {
+			console.log("🧩 Config to backend:", validFields);
+		} catch (err: any) {
 			console.error(err);
-			console.log("🧩 Config to backend:", config);
-			alert("❌ Có lỗi xảy ra khi điền form.");
+			console.log("🧩 Config to backend:", validFields);
+			const backendMessage =
+				err?.response?.data?.error || err?.message || null;
+			alert(
+				backendMessage
+					? `❌ ${backendMessage}`
+					: "❌ Có lỗi xảy ra khi điền form."
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -43,82 +77,102 @@ const FormFillerUI: React.FC<FormFillerUIProps> = ({ formLink, config }) => {
 				📝 Điền Form
 			</h2>
 
-			{config.map((field, index) => (
-				<div key={index} className="mb-6">
-					<label className="block text-gray-700 font-medium mb-2">
-						{field.question}
-					</label>
-					{field.type === "short-text" ||
-					field.type === "paragraph" ? (
-						<input
-							type="text"
-							placeholder={`Nhập giá trị cho biến "${field.variable}"`}
-							value={values[field.variable] || ""}
-							onChange={(e) =>
-								handleChange(field.variable, e.target.value)
-							}
-							className="w-full border border-gray-300 rounded-lg px-3 py-2"
-						/>
-					) : field.type === "multiple-choice" ||
-					  field.type === "dropdown" ? (
-						<select
-							title="Chọn một giá trị từ danh sách."
-							value={values[field.variable] || ""}
-							onChange={(
-								e: React.ChangeEvent<HTMLSelectElement>
-							) => handleChange(field.variable, e.target.value)}
-							className="w-full border border-gray-300 rounded-lg px-3 py-2">
-							<option value="">-- Chọn một giá trị --</option>
-							{field.options?.map((opt: string, i: number) => (
-								<option key={i} value={opt}>
-									{opt}
-								</option>
-							))}
-						</select>
-					) : field.type === "checkbox" ? (
-						<div className="space-y-2">
-							{field.options?.map((opt: string, i: number) => (
-								<label key={i} className="block">
-									<input
-										type="checkbox"
-										checked={(
-											values[field.variable] || ""
-										).includes(opt)}
-										onChange={(
-											e: React.ChangeEvent<HTMLInputElement>
-										) => {
-											const prev = values[field.variable]
-												? values[field.variable].split(
-														"||"
-													)
-												: [];
-											const newVal = e.target.checked
-												? [...prev, opt]
-												: prev.filter((v) => v !== opt);
-											handleChange(
-												field.variable,
-												newVal.join("||")
-											);
-										}}
-										className="mr-2"
-									/>
-									{opt}
-								</label>
-							))}
-						</div>
-					) : (
-						<input
-							type="text"
-							placeholder={`Nhập giá trị cho biến "${field.variable}"`}
-							value={values[field.variable] || ""}
-							onChange={(e) =>
-								handleChange(field.variable, e.target.value)
-							}
-							className="w-full border border-gray-300 rounded-lg px-3 py-2"
-						/>
-					)}
-				</div>
-			))}
+			{validFields.map((field, idx) => {
+				const varName = field.variable;
+				const value = values[varName];
+
+				return (
+					<div key={idx} className="mb-6">
+						<label className="block text-gray-700 font-medium mb-2">
+							{field.question}
+						</label>
+
+						{/* Short text */}
+						{field.type === "short-text" && (
+							<input
+								type="text"
+								placeholder={`Nhập "${field.question}"`}
+								value={value}
+								onChange={(e) =>
+									handleChange(varName, e.target.value)
+								}
+								className="w-full border border-gray-300 rounded-lg px-3 py-2"
+							/>
+						)}
+
+						{/* Paragraph */}
+						{field.type === "paragraph" && (
+							<textarea
+								placeholder={`Nhập "${field.question}"`}
+								value={value}
+								onChange={(e) =>
+									handleChange(varName, e.target.value)
+								}
+								className="w-full border border-gray-300 rounded-lg px-3 py-2"
+							/>
+						)}
+
+						{/* Date */}
+						{field.type === "date" && (
+							<input
+								title="Nhập giá trị cho trường này"
+								type="date"
+								value={value}
+								onChange={(e) =>
+									handleChange(varName, e.target.value)
+								}
+								className="w-full border border-gray-300 rounded-lg px-3 py-2"
+							/>
+						)}
+
+						{/* Multiple choice / Dropdown */}
+						{(field.type === "multiple-choice" ||
+							field.type === "dropdown") && (
+							<select
+								title="Nhập giá trị cho trường này"
+								value={value}
+								onChange={(e) =>
+									handleChange(varName, e.target.value)
+								}
+								className="w-full border border-gray-300 rounded-lg px-3 py-2">
+								<option value="">-- Chọn một giá trị --</option>
+								{field.options?.map((opt, i) => (
+									<option key={i} value={opt}>
+										{opt}
+									</option>
+								))}
+							</select>
+						)}
+
+						{/* Checkbox */}
+						{field.type === "checkbox" && (
+							<div className="space-y-2">
+								{field.options?.map((opt, i) => (
+									<label
+										key={i}
+										className="flex items-center">
+										<input
+											type="checkbox"
+											checked={(
+												value as string[]
+											).includes(opt)}
+											onChange={(e) =>
+												handleCheckboxChange(
+													varName,
+													opt,
+													e.target.checked
+												)
+											}
+											className="mr-2"
+										/>
+										{opt}
+									</label>
+								))}
+							</div>
+						)}
+					</div>
+				);
+			})}
 
 			<button
 				onClick={handleSubmit}

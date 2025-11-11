@@ -31,6 +31,25 @@ function normalizeText(text) {
 	);
 }
 
+function extractFormIdentifiers(link) {
+	try {
+		const url = new URL(link);
+		const segments = url.pathname.split("/").filter(Boolean);
+		const dIndex = segments.indexOf("d");
+		if (dIndex !== -1 && segments[dIndex + 1]) {
+			if (segments[dIndex + 1] === "e" && segments[dIndex + 2]) {
+				const formId = segments[dIndex + 2];
+				return { slug: `e/${formId}`, formId };
+			}
+			const formId = segments[dIndex + 1];
+			return { slug: formId, formId };
+		}
+	} catch (err) {
+		console.warn("extractFormIdentifiers error:", err.message);
+	}
+	return { slug: null, formId: null };
+}
+
 async function parseGoogleForm(formLink) {
 	function toViewForm(link) {
 		try {
@@ -48,7 +67,8 @@ async function parseGoogleForm(formLink) {
 	}
 
 	formLink = toViewForm(formLink);
-	const slug = formLink.match(/\/d\/([a-zA-Z0-9_-]+)\//)?.[1] || null;
+	const { slug, formId } = extractFormIdentifiers(formLink);
+	const canonicalSlug = slug || null;
 
 	const browser = await puppeteer.launch({
 		headless: true,
@@ -205,6 +225,7 @@ async function parseGoogleForm(formLink) {
 			type: type,
 			isMulti,
 			required,
+			options,
 			section: sections?.[0] || { id: 0, index: 0 },
 			totalAnswer: 1,
 			answer: [
@@ -224,16 +245,20 @@ async function parseGoogleForm(formLink) {
 		};
 	});
 
-	const idviewform = formLink.match(/\/e\/([a-zA-Z0-9_-]+)$/)?.[1] || "";
+	const idviewform = formId || null;
 	const now = new Date().toISOString();
+	const viewLink = formLink;
+	const editLink = canonicalSlug
+		? `https://docs.google.com/forms/d/${canonicalSlug}/edit`
+		: viewLink;
 
 	return {
 		form: {
-			slug,
-			idviewform,
+			slug: canonicalSlug || "",
+			idviewform: idviewform || "",
 			name: formTitle,
-			urlMain: `https://docs.google.com/forms/d/${slug}/edit`,
-			urlCopy: `https://docs.google.com/forms/d/${slug}/edit`,
+			urlMain: viewLink,
+			urlCopy: editLink,
 			loaddata,
 			sections,
 			page_histories: [],
@@ -242,7 +267,7 @@ async function parseGoogleForm(formLink) {
 			version: "25.4.1",
 			createdAt: now,
 			updatedAt: now,
-			id: slug,
+			id: canonicalSlug || "",
 		},
 		latest_form_questions: loaddata,
 		config: configData,

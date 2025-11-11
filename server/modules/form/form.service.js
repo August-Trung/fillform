@@ -29,7 +29,24 @@ async function saveFormToDB({
 	return formDoc;
 }
 
+function toViewForm(link) {
+	try {
+		const url = new URL(link);
+		if (!url.pathname.endsWith("/viewform")) {
+			url.pathname = url.pathname.replace(
+				/\/(edit|response)?$/,
+				"/viewform"
+			);
+		}
+		return url.toString();
+	} catch {
+		return link;
+	}
+}
+
 const fillFormWithData = async (formLink, values, config) => {
+	formLink = toViewForm(formLink);
+
 	const payload = {};
 	for (const field of config) {
 		if (field.entryId && values[field.variable] != null) {
@@ -38,13 +55,18 @@ const fillFormWithData = async (formLink, values, config) => {
 	}
 
 	const result = await submitGoogleForm(formLink, payload, {
-		timeout: 30000,
+		timeout: 60000,
 		headless: false,
 		slowMo: 500,
 	});
 
 	if (!result.ok) {
-		throw new Error(`Không thể submit form: ${result.error}`);
+		const errMsg = result.error || "Không rõ lỗi";
+		const error = new Error(`Không thể submit form: ${errMsg}`);
+		if (result.errorCode === "LOGIN_REQUIRED") {
+			error.statusCode = 400;
+		}
+		throw error;
 	}
 };
 
